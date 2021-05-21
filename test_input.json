@@ -14,8 +14,15 @@
     "env_vars": null,
     "metadata": {
       "name": "test_multiplex_check",
-      "namespace": "default"
-    }
+      "namespace": "default",
+      "annotations": {
+        "http-check/args/second/url": "https://sensu.io/",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/second/roger": "dogger",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/second/enable-terror": "",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/second/host": "sensu.io",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/second/path": "/bad/idea"
+        }
+      }
   },
   "entity": {
     "entity_class": "agent",
@@ -67,6 +74,7 @@
         "password": "REDACTED",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/": "hey",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/first/url": "hmm",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/second/other": "thing",
         "sensu_cluster_metrics_url": "https://localhost:8080/graphql --skip-insecure-verify"
       }
     },

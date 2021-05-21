@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 
@@ -14,16 +15,22 @@ import (
 // Config represents the check plugin config.
 type Config struct {
 	sensu.PluginConfig
-	Command     string
-	CommonArgs  string
-	CheckPrefix string
-	CreateEvent bool
-	DryRun      bool
+	Command          string
+	CommonSuffixArgs string
+	CommonPrefixArgs string
+	AnnotationPrefix string
+	CheckPrefix      string
+	EventsAPI        string
+	EventCheck       string
+	EventEntity      string
+	CreateEvent      bool
+	DryRun           bool
 }
 
 var (
 	argGroupMap = map[string]map[string]string{}
-	commandMap  = map[string]string{}
+	argsMap     = map[string]string{}
+	useStdin    = false
 	plugin      = Config{
 		PluginConfig: sensu.PluginConfig{
 			Name:     "sensu-multiplexer-check",
@@ -39,7 +46,7 @@ var (
 			Argument:  "command",
 			Shorthand: "c",
 			Default:   "",
-			Usage:     "command to run",
+			Usage:     "command executable to run. (Required)",
 			Value:     &plugin.Command,
 		},
 		&sensu.PluginConfigOption{
@@ -48,48 +55,69 @@ var (
 			Argument:  "common-arguments",
 			Shorthand: "a",
 			Default:   "",
-			Usage:     "common arguments for all annotation groups",
-			Value:     &plugin.CommonArgs,
+			Usage:     "common arguments for all annotation groups, appended to end of command. (Optional)",
+			Value:     &plugin.CommonSuffixArgs,
 		},
 		&sensu.PluginConfigOption{
-			Path:      "event-check-prefix",
-			Env:       "MULTIPLEX_EVENT_CHECK_PREFIX",
-			Argument:  "event-check-prefix",
+			Path:      "annotation-prefix",
+			Env:       "MULTIPLEX_ANNOTATION_PREFIX",
+			Argument:  "annotation-prefix",
 			Shorthand: "p",
-			Default:   "multiplex_",
-			Usage:     "prefix string to use in generated event",
-			Value:     &plugin.CheckPrefix,
+			Default:   "",
+			Usage:     "Annotation key prefix to parse for command groups. (Required)",
+			Value:     &plugin.AnnotationPrefix,
 		},
 		&sensu.PluginConfigOption{
-			Path:      "create-event",
-			Env:       "MULTIPLEX_CREATE_EVENT",
-			Argument:  "create-event",
-			Shorthand: "",
-			Default:   false,
-			Usage:     "create events",
-			Value:     &plugin.CreateEvent,
+			Path:     "event-check-prefix",
+			Env:      "MULTIPLEX_CHECK_NAME_PREFIX",
+			Argument: "check-name-prefix",
+			Default:  "multiplex_",
+			Usage:    "prefix string to use in check name for each annotation group. (Optional)",
+			Value:    &plugin.CheckPrefix,
+		},
+		&sensu.PluginConfigOption{
+			Path:     "event-entity",
+			Env:      "MULTIPLEX_EVENT_ENTITY",
+			Argument: "event-entity",
+			Default:  "",
+			Usage:    "json representation of substitute Sensu entity to use in generated events. (Optional)",
+			Value:    &plugin.EventEntity,
+		},
+		&sensu.PluginConfigOption{
+			Path:     "event-check",
+			Env:      "MULTIPLEX_EVENT_CHECK",
+			Argument: "event-check",
+			Default:  "",
+			Usage:    "json representation of substitute Sensu check to use in generated events. (Optional)",
+			Value:    &plugin.EventCheck,
 		},
 		&sensu.PluginConfigOption{
 			Path:      "dry-run",
 			Argument:  "dry-run",
 			Shorthand: "n",
 			Default:   false,
-			Usage:     "dry run",
+			Usage:     "dry run. Report generated events to stdout, but do not send them to events api. (Optional)",
 			Value:     &plugin.DryRun,
+		},
+		{
+			Path:     "events-api",
+			Env:      "",
+			Argument: "events-api",
+			Default:  "http://localhost:3031/events",
+			Usage:    "Events API endpoint to use when generating events, can be overridden by endpoint json attribute of same name",
+			Value:    &plugin.EventsAPI,
 		},
 	}
 )
 
 func main() {
-	useStdin := false
 	fi, err := os.Stdin.Stat()
 	if err != nil {
-		fmt.Printf("Error check stdin: %v\n", err)
+		fmt.Printf("Error accessing stdin: %v\n", err)
 		panic(err)
 	}
 	//Check the Mode bitmask for Named Pipe to indicate stdin is connected
 	if fi.Mode()&os.ModeNamedPipe != 0 {
-		log.Println("using stdin")
 		useStdin = true
 	}
 
@@ -98,11 +126,25 @@ func main() {
 }
 
 func checkArgs(event *types.Event) (int, error) {
-	/*
-		if len(plugin.Command) == 0 {
-			return sensu.CheckStateWarning, fmt.Errorf("--command or CHECK_COMMAND environment variable is required")
-		}
-	*/
+	if !useStdin {
+		return sensu.CheckStateCritical, fmt.Errorf("Sensu event must be passed via stdin. If running under Sensu agent, please check the calling Sensu check definition and make sure stdin is enabled")
+	}
+	fields := strings.Fields(plugin.Command)
+	if len(fields) == 0 {
+		return sensu.CheckStateWarning, fmt.Errorf("--command or MULTIPLEX_COMMAND environment variable is blank")
+	}
+	plugin.Command = fields[0]
+	if len(fields) > 1 {
+		plugin.CommonPrefixArgs = strings.Join(fields[1:], ` `)
+	}
+	if len(plugin.Command) == 0 {
+		return sensu.CheckStateWarning, fmt.Errorf("--command or MULTIPLEX_COMMAND environment variable is required")
+	}
+	if len(plugin.AnnotationPrefix) == 0 {
+		return sensu.CheckStateWarning, fmt.Errorf("--annotation-prefix or MULTIPLEX_ANNOTATION_PREFIX environment variable is required")
+	}
+	fmt.Printf("Fields: %q\n", fields)
+	fmt.Printf("Command: %s Args: %s\n", plugin.Command, plugin.CommonPrefixArgs)
 	return sensu.CheckStateOK, nil
 }
 
@@ -110,8 +152,14 @@ func executeCheck(event *types.Event) (int, error) {
 	log.Println("executing check with --command", plugin.Command)
 	log.Println("event", event)
 	createCommandlines(event)
-	for group, cmdline := range commandMap {
-		fmt.Printf("Group: %s Cmdline: %s\n", group, cmdline)
+	for group, args := range argsMap {
+		fmt.Printf("executing Command: %s Args: %s\n", plugin.Command, args)
+		fmt.Printf("exeucting Group: %s Command: %s Args: %s\n", group, plugin.Command, args)
+		cmd := exec.Command(plugin.Command, strings.Fields(args)...)
+		stdoutStderr, err := cmd.CombinedOutput()
+		if err != nil {
+		}
+		fmt.Printf("Group: %s Command: %s Args: %s\n Output: %s\n Err: %v\n", group, plugin.Command, args, stdoutStderr, err)
 	}
 	return sensu.CheckStateOK, nil
 }
@@ -124,45 +172,43 @@ func createCommandlines(event *types.Event) error {
 			optionMap[opt.Path] = opt
 		}
 	}
-	if plugin.Keyspace == "" {
+	if plugin.AnnotationPrefix == "" {
 		return nil
 	}
-	prefix := path.Join(plugin.Keyspace, "args") + "/"
+	prefix := path.Join(plugin.AnnotationPrefix) + "/"
 	fmt.Printf("Prefix: %v\n", prefix)
 	if event == nil {
 		return nil
 	}
 	if event.Check != nil {
-		processAnnotations(event.Check.Annotations, "Check")
+		processAnnotations(event.Check.Annotations, "Check", prefix)
 	}
 	if event.Entity != nil {
-		processAnnotations(event.Entity.Annotations, "Entity")
+		processAnnotations(event.Entity.Annotations, "Entity", prefix)
 	}
 	fmt.Printf("Final Annotation Map: %q\n", argGroupMap)
 	//loop over argument groups
 	for group, arguments := range argGroupMap {
 		//setup
-		command := plugin.Command
-		args := plugin.CommonArgs
+		args := plugin.CommonPrefixArgs
 		for argument, value := range arguments {
 			switch arg := argument; arg {
-			case "command":
-				command = value
 			default:
+				//string leading dashes?
+				//process long arguments
 				args = fmt.Sprintf("%s --%s %s", args, arg, value)
 			}
 		}
-		if len(command) > 0 {
-			cmdline := command + args
-			commandMap[group] = cmdline
+		args = fmt.Sprintf("%s %s", args, plugin.CommonSuffixArgs)
+		if len(plugin.Command) > 0 {
+			argsMap[group] = args
 		}
 	}
 
 	return nil
 }
 
-func processAnnotations(annotations map[string]string, annotationSource string) {
-	prefix := path.Join(plugin.Keyspace, "args") + "/"
+func processAnnotations(annotations map[string]string, annotationSource string, prefix string) {
 	for key, value := range annotations {
 		if strings.HasPrefix(key, prefix) {
 			path := strings.SplitN(key, prefix, 2)[1]
