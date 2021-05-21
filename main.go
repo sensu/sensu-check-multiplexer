@@ -191,6 +191,9 @@ func createCommandlines(event *types.Event) error {
 	for group, arguments := range argGroupMap {
 		//setup
 		args := plugin.CommonPrefixArgs
+		if len(argsMap[group]) > 0 {
+			args = fmt.Sprintf("%s %s", args, argsMap[group])
+		}
 		for argument, value := range arguments {
 			switch arg := argument; arg {
 			default:
@@ -213,20 +216,29 @@ func processAnnotations(annotations map[string]string, annotationSource string, 
 		if strings.HasPrefix(key, prefix) {
 			path := strings.SplitN(key, prefix, 2)[1]
 			if len(path) > 0 {
+				group := ""
+				opt := ""
 				subpath := strings.SplitN(path, "/", 2)
-				group := subpath[0]
-				opt := subpath[1]
-				if len(group) > 0 && len(opt) > 0 {
+				if len(subpath) > 0 {
+					group = subpath[0]
 					groupMap := argGroupMap[group]
 					if groupMap == nil { // initialize map
 						fmt.Printf("%s initialize Map: %v\n", annotationSource, group)
 						argGroupMap[group] = map[string]string{}
-						groupMap = argGroupMap[group]
 					}
-					argGroupMap[group][opt] = value
-					fmt.Printf("%s annotation: Group: %v Opt: %v Value: %v\n",
-						annotationSource, group, opt, argGroupMap[group][opt])
-				} else {
+					if group == path {
+						argsMap[group] = value
+						fmt.Printf("%s annotation: Group: %v Args Value: %v\n",
+							annotationSource, group, argsMap[group])
+					}
+				}
+				if len(subpath) == 2 {
+					opt = subpath[1]
+					if len(group) > 0 && len(opt) > 0 {
+						argGroupMap[group][opt] = value
+						fmt.Printf("%s annotation: Group: %v Opt: %v Value: %v\n",
+							annotationSource, group, opt, argGroupMap[group][opt])
+					}
 				}
 			}
 		}

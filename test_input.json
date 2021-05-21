@@ -16,6 +16,7 @@
       "name": "test_multiplex_check",
       "namespace": "default",
       "annotations": {
+        "http-check/args/test": "-u https://docs.sensu.io/",
         "http-check/args/second/url": "https://sensu.io/",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/second/roger": "dogger",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/second/enable-terror": "",
