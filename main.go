@@ -151,14 +151,15 @@ func checkArgs(event *types.Event) (int, error) {
 func executeCheck(event *types.Event) (int, error) {
 	log.Println("executing check with --command", plugin.Command)
 	log.Println("event", event)
-	createCommandlines(event)
+	err := createCommandlines(event)
+	if err != nil {
+		return sensu.CheckStateCritical, err
+	}
 	for group, args := range argsMap {
 		fmt.Printf("executing Command: %s Args: %s\n", plugin.Command, args)
 		fmt.Printf("exeucting Group: %s Command: %s Args: %s\n", group, plugin.Command, args)
 		cmd := exec.Command(plugin.Command, strings.Fields(args)...)
 		stdoutStderr, err := cmd.CombinedOutput()
-		if err != nil {
-		}
 		fmt.Printf("Group: %s Command: %s Args: %s\n Output: %s\n Err: %v\n", group, plugin.Command, args, stdoutStderr, err)
 	}
 	return sensu.CheckStateOK, nil
@@ -189,21 +190,19 @@ func createCommandlines(event *types.Event) error {
 	fmt.Printf("Final Annotation Map: %q\n", argGroupMap)
 	//loop over argument groups
 	for group, arguments := range argGroupMap {
-		//setup
+		// start with common prefix args stripped from the command
 		args := plugin.CommonPrefixArgs
+		// if argsMap[group] already filled just use it do not process individual annotation option values
 		if len(argsMap[group]) > 0 {
 			args = fmt.Sprintf("%s %s", args, argsMap[group])
 		} else {
 			for argument, value := range arguments {
-				switch arg := argument; arg {
-				default:
-					//string leading dashes?
-					//process long arguments
-					args = fmt.Sprintf("%s --%s %s", args, arg, value)
-				}
+				args = fmt.Sprintf("%s --%s %s", args, argument, value)
 			}
 		}
+		// add common suffix arguments
 		args = fmt.Sprintf("%s %s", args, plugin.CommonSuffixArgs)
+		// store in argsMap
 		if len(plugin.Command) > 0 {
 			argsMap[group] = args
 		}
