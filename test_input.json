@@ -1,0 +1,76 @@
+{
+  "check": {
+    "handlers": [
+      "test_handler"
+    ],
+    "interval": 20,
+    "publish": false,
+    "subscriptions": [
+      "test"
+    ],
+    "stdin": true,
+    "ttl": 60,
+    "timeout": 30,
+    "env_vars": null,
+    "metadata": {
+      "name": "test_multiplex_check",
+      "namespace": "default"
+    }
+  },
+  "entity": {
+    "entity_class": "agent",
+    "system": {
+      "hostname": "test-entity",
+      "os": "linux",
+      "platform": "centos",
+      "platform_family": "rhel",
+      "platform_version": "7",
+      "arch": "amd64",
+      "libc_type": "glibc",
+      "vm_system": "kvm",
+      "vm_role": "host",
+      "cloud_provider": "",
+      "processes": null
+    },
+    "subscriptions": [
+      "sensu",
+      "test",
+      "hmm",
+      "system/linux",
+      "entity:test-entity"
+    ],
+    "deregister": false,
+    "deregistration": {},
+    "user": "agent",
+    "redact": [
+      "password",
+      "passwd",
+      "pass",
+      "api_key",
+      "api_token",
+      "access_key",
+      "secret_key",
+      "private_key",
+      "secret"
+    ],
+    "metadata": {
+      "name": "test-entity",
+      "namespace": "default",
+      "labels": {
+        "what": "now"
+      },
+      "annotations": {
+        "LetsNot": "go there",
+        "check_http_url": "http://www.sensu.io",
+        "header_value": "this is a header",
+        "latte_flavor": "pumpkin_spice",
+        "password": "REDACTED",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/": "hey",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/first/url": "hmm",
+        "sensu_cluster_metrics_url": "https://localhost:8080/graphql --skip-insecure-verify"
+      }
+    },
+    "sensu_agent_version": "6.2.7"
+  }
+}
+

@@ -14,11 +14,17 @@ import (
 // Config represents the check plugin config.
 type Config struct {
 	sensu.PluginConfig
-	Example string
+	Command     string
+	CommonArgs  string
+	CheckPrefix string
+	CreateEvent bool
+	DryRun      bool
 }
 
 var (
-	plugin = Config{
+	argGroupMap = map[string]map[string]string{}
+	commandMap  = map[string]string{}
+	plugin      = Config{
 		PluginConfig: sensu.PluginConfig{
 			Name:     "sensu-multiplexer-check",
 			Short:    "Multiplexer Check",
@@ -28,13 +34,48 @@ var (
 
 	options = []*sensu.PluginConfigOption{
 		&sensu.PluginConfigOption{
-			Path:      "example",
-			Env:       "CHECK_EXAMPLE",
-			Argument:  "example",
-			Shorthand: "e",
+			Path:      "command",
+			Env:       "MULTIPLEX_COMMAND",
+			Argument:  "command",
+			Shorthand: "c",
 			Default:   "",
-			Usage:     "An example string configuration option",
-			Value:     &plugin.Example,
+			Usage:     "command to run",
+			Value:     &plugin.Command,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "common-arguments",
+			Env:       "MULTIPLEX_COMMON_ARGUMENTS",
+			Argument:  "common-arguments",
+			Shorthand: "a",
+			Default:   "",
+			Usage:     "common arguments for all annotation groups",
+			Value:     &plugin.CommonArgs,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "event-check-prefix",
+			Env:       "MULTIPLEX_EVENT_CHECK_PREFIX",
+			Argument:  "event-check-prefix",
+			Shorthand: "p",
+			Default:   "multiplex_",
+			Usage:     "prefix string to use in generated event",
+			Value:     &plugin.CheckPrefix,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "create-event",
+			Env:       "MULTIPLEX_CREATE_EVENT",
+			Argument:  "create-event",
+			Shorthand: "",
+			Default:   false,
+			Usage:     "create events",
+			Value:     &plugin.CreateEvent,
+		},
+		&sensu.PluginConfigOption{
+			Path:      "dry-run",
+			Argument:  "dry-run",
+			Shorthand: "n",
+			Default:   false,
+			Usage:     "dry run",
+			Value:     &plugin.DryRun,
 		},
 	}
 )
@@ -57,20 +98,26 @@ func main() {
 }
 
 func checkArgs(event *types.Event) (int, error) {
-	if len(plugin.Example) == 0 {
-		return sensu.CheckStateWarning, fmt.Errorf("--example or CHECK_EXAMPLE environment variable is required")
-	}
+	/*
+		if len(plugin.Command) == 0 {
+			return sensu.CheckStateWarning, fmt.Errorf("--command or CHECK_COMMAND environment variable is required")
+		}
+	*/
 	return sensu.CheckStateOK, nil
 }
 
 func executeCheck(event *types.Event) (int, error) {
-	log.Println("executing check with --example", plugin.Example)
+	log.Println("executing check with --command", plugin.Command)
 	log.Println("event", event)
-	argsArray(event)
+	createCommandlines(event)
+	for group, cmdline := range commandMap {
+		fmt.Printf("Group: %s Cmdline: %s\n", group, cmdline)
+	}
 	return sensu.CheckStateOK, nil
 }
 
-func argsArray(event *types.Event) error {
+func createCommandlines(event *types.Event) error {
+	//map with string keys and values of a map with string keys and string values
 	optionMap := make(map[string]*sensu.PluginConfigOption)
 	for _, opt := range options {
 		if len(opt.Path) > 0 {
@@ -86,34 +133,57 @@ func argsArray(event *types.Event) error {
 		return nil
 	}
 	if event.Check != nil {
-		for key := range event.Check.Annotations {
-			if strings.HasPrefix(key, prefix) {
-				path := strings.SplitN(key, prefix, 2)[1]
-				if len(path) > 0 {
-					subpath := strings.SplitN(path, "/", 2)
-					group := subpath[0]
-					opt := subpath[1]
-					if len(group) > 0 {
-						fmt.Printf("Check annotation Group: %v Opt: %v\n", group, opt)
-					}
-				}
-			}
-		}
+		processAnnotations(event.Check.Annotations, "Check")
 	}
 	if event.Entity != nil {
-		for key := range event.Entity.Annotations {
-			if strings.HasPrefix(key, prefix) {
-				path := strings.SplitN(key, prefix, 2)[1]
-				if len(path) > 0 {
-					subpath := strings.SplitN(path, "/", 2)
-					group := subpath[0]
-					opt := subpath[1]
-					if len(group) > 0 {
-						fmt.Printf("Entity annotation Group: %v Opt: %v\n", group, opt)
+		processAnnotations(event.Entity.Annotations, "Entity")
+	}
+	fmt.Printf("Final Annotation Map: %q\n", argGroupMap)
+	//loop over argument groups
+	for group, arguments := range argGroupMap {
+		//setup
+		command := plugin.Command
+		args := plugin.CommonArgs
+		for argument, value := range arguments {
+			switch arg := argument; arg {
+			case "command":
+				command = value
+			default:
+				args = fmt.Sprintf("%s --%s %s", args, arg, value)
+			}
+		}
+		if len(command) > 0 {
+			cmdline := command + args
+			commandMap[group] = cmdline
+		}
+	}
+
+	return nil
+}
+
+func processAnnotations(annotations map[string]string, annotationSource string) {
+	prefix := path.Join(plugin.Keyspace, "args") + "/"
+	for key, value := range annotations {
+		if strings.HasPrefix(key, prefix) {
+			path := strings.SplitN(key, prefix, 2)[1]
+			if len(path) > 0 {
+				subpath := strings.SplitN(path, "/", 2)
+				group := subpath[0]
+				opt := subpath[1]
+				if len(group) > 0 && len(opt) > 0 {
+					groupMap := argGroupMap[group]
+					if groupMap == nil { // initialize map
+						fmt.Printf("%s initialize Map: %v\n", annotationSource, group)
+						argGroupMap[group] = map[string]string{}
+						groupMap = argGroupMap[group]
 					}
+					argGroupMap[group][opt] = value
+					fmt.Printf("%s annotation: Group: %v Opt: %v Value: %v\n",
+						annotationSource, group, opt, argGroupMap[group][opt])
+				} else {
 				}
 			}
 		}
 	}
-	return nil
+
 }
