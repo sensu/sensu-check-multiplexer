@@ -193,13 +193,14 @@ func createCommandlines(event *types.Event) error {
 		args := plugin.CommonPrefixArgs
 		if len(argsMap[group]) > 0 {
 			args = fmt.Sprintf("%s %s", args, argsMap[group])
-		}
-		for argument, value := range arguments {
-			switch arg := argument; arg {
-			default:
-				//string leading dashes?
-				//process long arguments
-				args = fmt.Sprintf("%s --%s %s", args, arg, value)
+		} else {
+			for argument, value := range arguments {
+				switch arg := argument; arg {
+				default:
+					//string leading dashes?
+					//process long arguments
+					args = fmt.Sprintf("%s --%s %s", args, arg, value)
+				}
 			}
 		}
 		args = fmt.Sprintf("%s %s", args, plugin.CommonSuffixArgs)
