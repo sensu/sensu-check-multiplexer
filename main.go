@@ -185,6 +185,9 @@ func executeCheck(event *types.Event) (int, error) {
 			commands = append(commands, c)
 			defer wg.Done()
 		}(group, &wg)
+		if plugin.DryRun {
+			wg.Wait()
+		}
 	}
 	// Wait for all commands to finish executing
 	wg.Wait()
@@ -217,7 +220,7 @@ func (c *Command) Run(group string) {
 	c.CommandString = cmd.String()
 	c.CommandError = err
 	c.CheckName = fmt.Sprintf("%s%s", plugin.CheckNamePrefix, group)
-	if c.CommandError != nil {
+	if c.CommandError != nil && cmd.ProcessState == nil {
 		c.Output = fmt.Sprintf("Unknown error running command: %s", c.CommandError)
 		c.Status = 3
 	} else {
@@ -225,7 +228,7 @@ func (c *Command) Run(group string) {
 		c.Status = cmd.ProcessState.ExitCode()
 	}
 	if plugin.DryRun {
-		fmt.Printf("Ran Command: %#v\n Status: %d\n Err: %v", c, c.Status, c.CommandError)
+		fmt.Printf("Ran Command: %#v\n Status: %d\n Err: %v\n", c.CommandString, c.Status, c.CommandError)
 	}
 
 }
