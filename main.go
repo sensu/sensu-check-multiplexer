@@ -192,10 +192,23 @@ func executeCheck(event *types.Event) (int, error) {
 		fmt.Printf("\n\nNormal Output\n")
 	}
 	// Build Output Summary
+	fmt.Printf("Event Summary:\n")
+	var eventError bool
 	for _, c := range commands {
-		fmt.Printf("Event For Command: %s Error: %v\n", c.CommandString, c.EventError)
+		var errString string
+		if c.EventError == nil {
+			errString = "none"
+		} else {
+			eventError = true
+			errString = fmt.Sprintf("%v", c.EventError)
+		}
+		fmt.Printf("Event For Command: %s\n Output: %s\n Status: %v\n Error: %v\n", c.CommandString, c.Output, c.Status, errString)
 	}
-	return sensu.CheckStateOK, nil
+	if eventError {
+		return sensu.CheckStateCritical, nil
+	} else {
+		return sensu.CheckStateOK, nil
+	}
 }
 func (c *Command) Run(group string) {
 	args := argsMap[group]
@@ -204,10 +217,15 @@ func (c *Command) Run(group string) {
 	c.CommandString = cmd.String()
 	c.CommandError = err
 	c.CheckName = fmt.Sprintf("%s%s", plugin.CheckNamePrefix, group)
-	c.Output = string(output)
-	c.Status = cmd.ProcessState.ExitCode()
+	if c.CommandError != nil {
+		c.Output = fmt.Sprintf("Unknown error running command: %s", c.CommandError)
+		c.Status = 3
+	} else {
+		c.Output = string(output)
+		c.Status = cmd.ProcessState.ExitCode()
+	}
 	if plugin.DryRun {
-		fmt.Printf("Ran Command: %#v\n", c)
+		fmt.Printf("Ran Command: %#v\n Status: %d\n Err: %v", c, c.Status, c.CommandError)
 	}
 
 }
