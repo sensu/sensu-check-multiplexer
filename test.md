@@ -1,5 +1,5 @@
 # Test example
 
 ```
-cat test_input.json | ./sensu_multiplex_check --comand test_command
+cat minimal_input.json | ./sensu-multiplexer-check --command http-check -p "http-check/args/" -n
 ```

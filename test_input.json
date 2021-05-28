@@ -20,6 +20,7 @@
         "http-check/args/second/url": "https://sensu.io/",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/second/roger": "dogger",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/second/enable-dancebot": "",
+        "sensu.io/plugins/sensu-multiplexer-check/config/args/second/engage-engines": "true",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/second/host": "sensu.io",
         "sensu.io/plugins/sensu-multiplexer-check/config/args/second/path": "/bad/idea"
         }

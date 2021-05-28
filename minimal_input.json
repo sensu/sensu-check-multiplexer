@@ -1,0 +1,20 @@
+{
+  "check": {
+    "metadata": {
+      "annotations": {
+        "http-check/args/check-test": "-u https://www.sensu.io/",
+        "http-check/args/bad/url": "http://bonsai.sensu.io/"
+        }
+      }
+  },
+  "entity": {
+    "metadata": {
+      "annotations": {
+        "http-check/args/entity-test": "-u https://docs.sensu.io/",
+        "http-check/args/good/url": "http://bonsai.sensu.io/",
+        "http-check/args/first/redirect-ok": ""
+      }
+    }
+  }
+}
+
