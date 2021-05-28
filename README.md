@@ -135,12 +135,14 @@ $ sensuctl event list --field-selector 'event.check.name matches "multiplex_"'
 
 ## Configuration
 
+ 
 
-## Annotation Formatting
+## Command Argument Annotation Formatting
 
-The annotation keys need to follow a special format. The initial annotation prefix must be 
-configured via the call to `sensu-multiplexer-check`. The argument_group segment of the 
-annotation key following the prefix, will be used as part of the generated event name.
+The annotation keys inteded to be used as the multiplexed command arguments need to follow a special format
+that includes an prefix string followed by an argument group string. The initial annotation prefix must be 
+configured via the call to `sensu-multiplexer-check`. The argument group segment will be used as part of the 
+generated event name.
 
 ### Individual Argument Annotation Key Format
 
@@ -169,15 +171,18 @@ argument convention, you can construct a single command string by using an annot
 that ends with the argument group.
 
 ```
-<annotation_prefix>/<argument_group>
+<annotation_prefix>/<argument_group> : <full_argument_string>
 ```
+Individual argument annotations in an argument group will be appended to the cmdline argument list after
+the value of this annotation.  
 
 Ex:
 ```
-"http-check/args/test": "-r -u http://bonsai.sensu.io/"
+"http-check/args/test": "-i -u https://localhost/"
+"http-check/args/test/redirect-ok": ""
 ```
 
-The full argument string for the `test` argument group is just the annotation value. 
+The full argument string for the `test` argument group would be `-i -u https://localhost/ --redirect-ok` 
 
 ### Asset registration
 
@@ -211,6 +216,32 @@ spec:
 ```
 
 Note: `stdin: true` is required for the multiplexer to work. The command arguments are taken from the json passed into the check command by sensu-agent.
+
+### Annotation Keyspace
+Because this check requires stdin, all of the commandline arguments can be set via entity or check level annotations using 
+the annotation prefix: `sensu.io/plugins/sensu-multiplexer-check/config`
+
+#### Annotated Check definition example 
+
+```yml
+---
+type: CheckConfig
+api_version: core/v2
+metadata:
+  name: multiplexed-http-check
+  namespace: default
+  annotations: 
+    sensu.io/plugins/sensu-multiplexer-check/config/command: http-check
+    sensu.io/plugins/sensu-multiplexer-check/config/annotation-prefix: http-check/args
+spec:
+  command: sensu-multiplexer-check
+  stdin: true
+  subscriptions:
+  - system
+  runtime_assets:
+  - sensu/sensu-multiplexer-check
+  - sensu/http-checks
+```
 
 ## Installation from source
 
