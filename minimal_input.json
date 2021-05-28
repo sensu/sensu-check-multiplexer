@@ -12,7 +12,7 @@
       "annotations": {
         "http-check/args/entity-test": "-u https://docs.sensu.io/",
         "http-check/args/good/url": "http://bonsai.sensu.io/",
-        "http-check/args/first/redirect-ok": ""
+        "http-check/args/good/redirect-ok": ""
       }
     }
   }
