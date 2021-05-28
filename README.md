@@ -1,39 +1,11 @@
-[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/jspaleta/sensu-multiplexer-check)
-![Go Test](https://github.com/jspaleta/sensu-multiplexer-check/workflows/Go%20Test/badge.svg)
-![goreleaser](https://github.com/jspaleta/sensu-multiplexer-check/workflows/goreleaser/badge.svg)
-
-# Check Plugin Template
-
-## Overview
-check-plugin-template is a template repository which wraps the [Sensu Plugin SDK][2].
-To use this project as a template, click the "Use this template" button from the main project page.
-Once the repository is created from this template, you can use the [Sensu Plugin Tool][9] to
-populate the templated fields with the proper values.
-
-## Functionality
-
-After successfully creating a project from this template, update the `Config` struct with any
-configuration options for the plugin, map those values as plugin options in the variable `options`,
-and customize the `checkArgs` and `executeCheck` functions in [main.go][7].
-
-When writing or updating a plugin's README from this template, review the Sensu Community
-[plugin README style guide][3] for content suggestions and guidance. Remove everything
-prior to `# Multiplexer Check` from the generated README file, and add additional context about the
-plugin per the style guide.
-
-## Releases with Github Actions
-
-To release a version of your project, simply tag the target sha with a semver release without a `v`
-prefix (ex. `1.0.0`). This will trigger the [GitHub action][5] workflow to [build and release][4]
-the plugin with goreleaser. Register the asset with [Bonsai][8] to share it with the community!
-
-***
+[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/sensu/sensu-multiplexer-check)
+![Go Test](https://github.com/sensu/sensu-multiplexer-check/workflows/Go%20Test/badge.svg)
+![goreleaser](https://github.com/sensu/sensu-multiplexer-check/workflows/goreleaser/badge.svg)
 
 # Multiplexer Check
 
 ## Table of Contents
 - [Overview](#overview)
-- [Files](#files)
 - [Usage examples](#usage-examples)
 - [Configuration](#configuration)
   - [Asset registration](#asset-registration)
@@ -43,14 +15,169 @@ the plugin with goreleaser. Register the asset with [Bonsai][8] to share it with
 - [Contributing](#contributing)
 
 ## Overview
+The Multiplexer Check is a [Sensu Check][6] that allows to run a command multiple times with different 
+arguments and generate separate Sensu events for each command execution.
 
-The Multiplexer Check is a [Sensu Check][6] that ...
+The command calling arguments are controlled using either check or entity annotations.
+Annotation keys are specially formatted to encode named argument groups, with each argument group
+representing a separate iteration of the command to run
 
-## Files
+Note: The Sensu Check configurion must specify `stdin: true` for correct operation
 
 ## Usage examples
 
+### sensu-multiplexer-check
+
+#### Help output
+
+```
+Multiplexer Check
+
+Usage:
+  sensu-multiplexer-check [flags]
+  sensu-multiplexer-check [command]
+
+Available Commands:
+  help        Help about any command
+  version     Print the version number of this plugin
+
+Flags:
+  -p, --annotation-prefix string   Annotation key prefix to parse for command groups. (Required)
+      --check-name-prefix string   prefix string to use in check name for each annotation group. (Optional) (default "multiplex_")
+  -c, --command string             command executable to run. (Required)
+  -a, --common-arguments string    common arguments for all annotation groups, appended to end of command. (Optional)
+  -n, --dry-run                    dry run. Report generated events to stdout, but do not send them to events api. (Optional)
+      --event-check string         json representation of substitute Sensu check to use in generated events. (Optional)
+      --event-entity string        json representation of substitute Sensu entity to use in generated events. (Optional)
+      --events-api string          Events API endpoint to use when generating events, can be overridden by endpoint json attribute of same name (default "http://localhost:3031/events")
+  -h, --help                       help for sensu-multiplexer-check
+
+Use "sensu-multiplexer-check [command] --help" for more information about a command.
+
+```
+
+#### Multiplexed http-check example
+
+Here is a mock event structure that contains example entity and check annotations that will be processed
+as four different argument groups for the `http-check` command, resulting in 4 iterations of the command being run.
+
+test.json
+```
+{
+  "check": {
+    "metadata": {
+      "annotations": {
+        "http-check/args/check-test": "-u https://www.sensu.io/",
+        "http-check/args/bad/url": "http://bonsai.sensu.io/"
+        }
+      }
+  },
+  "entity": {
+    "metadata": {
+      "annotations": {
+        "http-check/args/entity-test": "-u https://docs.sensu.io/",
+        "http-check/args/good/url": "http://bonsai.sensu.io/",
+        "http-check/args/good/redirect-ok": ""
+      }
+    }
+  }
+}
+
+```
+
+Test innovation on the cmdline, using the local running sensu-agent events API:
+```
+$ cat test.json | ./sensu-multiplexer-check --command "http-check" \
+--annotation-prefix "http-check/args" --events-api "http://localhost:3031/events"
+
+Event Summary:
+Event For Command: /usr/local/bin/http-check --redirect-ok
+ Output: http-check CRITICAL: HTTP Status 403 for http://localhost:80/
+
+ Status: 2
+ Error: none
+Event For Command: /usr/local/bin/http-check --url http://bonsai.sensu.io/
+ Output: http-check WARNING: HTTP Status 301 for http://bonsai.sensu.io/  (redirects to https://bonsai.sensu.io/)
+
+ Status: 1
+ Error: none
+Event For Command: /usr/local/bin/http-check --url http://bonsai.sensu.io/
+ Output: http-check WARNING: HTTP Status 301 for http://bonsai.sensu.io/  (redirects to https://bonsai.sensu.io/)
+
+ Status: 1
+ Error: none
+Event For Command: /user/local/bin/http-check -u https://docs.sensu.io/
+ Output: http-check OK: HTTP Status 200 for https://docs.sensu.io/
+
+ Status: 0
+ Error: none
+Event For Command: /user/local/bin/http-check -u https://www.sensu.io/
+ Output: http-check OK: HTTP Status 200 for https://www.sensu.io/
+
+ Status: 0
+ Error: none
+```
+
+There are now 4 generated events corresponding to each of the argument groups 
+```
+$ sensuctl event list --field-selector 'event.check.name matches "multiplex_"'
+     Entity              Check                                                            Output                                                    Status
+ ────────────── ─────────────────────── ────────────────────────────────────────────────────────────────────────────────────────────────────────── ────────
+  local_agent   multiplex_bad           http-check WARNING: HTTP Status 301 for http://bonsai.sensu.io/  (redirects to https://bonsai.sensu.io/)        1  
+                                                                                                                                                                                                                                               
+  local_agent   multiplex_check-test    http-check OK: HTTP Status 200 for https://www.sensu.io/                                                        0   
+                                                                                                                                                                                                                                               
+  local_agent   multiplex_entity-test   http-check OK: HTTP Status 200 for https://docs.sensu.io/                                                       0  
+                                                                                                                                                                                                                                               
+  local_agent   multiplex_good          http-check OK: HTTP Status 200 for https://bonsai.sensu.io/ (redirect from http://bonsai.sensu.io/)             0   
+```
+
+
 ## Configuration
+
+
+## Annotation Formatting
+
+The annotation keys need to follow a special format. The initial annotation prefix must be 
+configured via the call to `sensu-multiplexer-check`. The argument_group segment of the 
+annotation key following the prefix, will be used as part of the generated event name.
+
+### Individual Argument Annotation Key Format
+
+Individual arguments for a argument group can be added using their own key.
+These arguments must conform to the standard convention of double dash prefix for
+long argument `--long_argument`
+```
+<annotation_prefix>/<argument_group>/<long_argument> : <argument_value>
+```
+Multiple individual argument annotations can be composed to form a complete
+set of commandline arguments.
+
+Ex:
+```
+"http-check/args/bonsai/url": "http://bonsai.sensu.io/"
+"http-check/args/bonsai/redirecti-ok": ""
+```
+These annotations represents the argument string `--url http://bonsai.sensu.io/ --redirect-ok`
+when using the annotation prefix `http-check/args`.  The argument group name
+for the command will be `bonsai`.
+
+### Combined Argument Annotation Key Format
+
+For commands that have calling arguments that do not conform to the long
+argument convention, you can construct a single command string by using an annotation
+that ends with the argument group.
+
+```
+<annotation_prefix>/<argument_group>
+```
+
+Ex:
+```
+"http-check/args/test": "-r -u http://bonsai.sensu.io/"
+```
+
+The full argument string for the `test` argument group is just the annotation value. 
 
 ### Asset registration
 
@@ -59,10 +186,10 @@ consider doing so! If you're using sensuctl 5.13 with Sensu Backend 5.13 or late
 following command to add the asset:
 
 ```
-sensuctl asset add jspaleta/sensu-multiplexer-check
+sensuctl asset add sensu/sensu-multiplexer-check
 ```
 
-If you're using an earlier version of sensuctl, you can find the asset on the [Bonsai Asset Index][https://bonsai.sensu.io/assets/jspaleta/sensu-multiplexer-check].
+If you're using an earlier version of sensuctl, you can find the asset on the [Bonsai Asset Index][https://bonsai.sensu.io/assets/sensu/sensu-multiplexer-check].
 
 ### Check definition
 
@@ -71,15 +198,19 @@ If you're using an earlier version of sensuctl, you can find the asset on the [B
 type: CheckConfig
 api_version: core/v2
 metadata:
-  name: sensu-multiplexer-check
+  name: multiplexed-http-check
   namespace: default
 spec:
-  command: sensu-multiplexer-check --example example_arg
+  command: sensu-multiplexer-check --command http-check --annotation-prefix "http-check/args"
+  stdin: true
   subscriptions:
   - system
   runtime_assets:
-  - jspaleta/sensu-multiplexer-check
+  - sensu/sensu-multiplexer-check
+  - sensu/http-checks
 ```
+
+Note: `stdin: true` is required for the multiplexer to work. The command arguments are taken from the json passed into the check command by sensu-agent.
 
 ## Installation from source
 
@@ -100,12 +231,11 @@ go build
 For more information about contributing to this plugin, see [Contributing][1].
 
 [1]: https://github.com/sensu/sensu-go/blob/master/CONTRIBUTING.md
-[2]: https://github.com/sensu-community/sensu-plugin-sdk
-[3]: https://github.com/sensu-plugins/community/blob/master/PLUGIN_STYLEGUIDE.md
-[4]: https://github.com/sensu-community/check-plugin-template/blob/master/.github/workflows/release.yml
-[5]: https://github.com/sensu-community/check-plugin-template/actions
+[2]: https://github.com/sensu/sensu-plugin-sdk
+[4]: https://github.com/sensu/check-plugin-template/blob/master/.github/workflows/release.yml
+[5]: https://github.com/sensu/check-plugin-template/actions
 [6]: https://docs.sensu.io/sensu-go/latest/reference/checks/
-[7]: https://github.com/sensu-community/check-plugin-template/blob/master/main.go
+[7]: https://github.com/sensu/check-plugin-template/blob/master/main.go
 [8]: https://bonsai.sensu.io/
-[9]: https://github.com/sensu-community/sensu-plugin-tool
+[9]: https://github.com/sensu/sensu-plugin-tool
 [10]: https://docs.sensu.io/sensu-go/latest/reference/assets/
