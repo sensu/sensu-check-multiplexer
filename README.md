@@ -1,6 +1,6 @@
-[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/sensu/sensu-multiplexer-check)
-![Go Test](https://github.com/sensu/sensu-multiplexer-check/workflows/Go%20Test/badge.svg)
-![goreleaser](https://github.com/sensu/sensu-multiplexer-check/workflows/goreleaser/badge.svg)
+[![Sensu Bonsai Asset](https://img.shields.io/badge/Bonsai-Download%20Me-brightgreen.svg?colorB=89C967&logo=sensu)](https://bonsai.sensu.io/assets/sensu/sensu-check-multiplexer)
+![Go Test](https://github.com/sensu/sensu-check-multiplexer/workflows/Go%20Test/badge.svg)
+![goreleaser](https://github.com/sensu/sensu-check-multiplexer/workflows/goreleaser/badge.svg)
 
 # Multiplexer Check
 
@@ -26,7 +26,7 @@ Note: The Sensu Check configurion must specify `stdin: true` for correct operati
 
 ## Usage examples
 
-### sensu-multiplexer-check
+### sensu-check-multiplexer
 
 #### Help output
 
@@ -34,8 +34,8 @@ Note: The Sensu Check configurion must specify `stdin: true` for correct operati
 Multiplexer Check
 
 Usage:
-  sensu-multiplexer-check [flags]
-  sensu-multiplexer-check [command]
+  sensu-check-multiplexer [flags]
+  sensu-check-multiplexer [command]
 
 Available Commands:
   help        Help about any command
@@ -50,9 +50,9 @@ Flags:
       --event-check string         json representation of substitute Sensu check to use in generated events. (Optional)
       --event-entity string        json representation of substitute Sensu entity to use in generated events. (Optional)
       --events-api string          Events API endpoint to use when generating events, can be overridden by endpoint json attribute of same name (default "http://localhost:3031/events")
-  -h, --help                       help for sensu-multiplexer-check
+  -h, --help                       help for sensu-check-multiplexer
 
-Use "sensu-multiplexer-check [command] --help" for more information about a command.
+Use "sensu-check-multiplexer [command] --help" for more information about a command.
 
 ```
 
@@ -87,7 +87,7 @@ test.json
 
 Test innovation on the cmdline, using the local running sensu-agent events API:
 ```
-$ cat test.json | ./sensu-multiplexer-check --command "http-check" \
+$ cat test.json | ./sensu-check-multiplexer --command "http-check" \
 --annotation-prefix "http-check/args" --events-api "http://localhost:3031/events"
 
 Event Summary:
@@ -141,7 +141,7 @@ $ sensuctl event list --field-selector 'event.check.name matches "multiplex_"'
 
 The annotation keys inteded to be used as the multiplexed command arguments need to follow a special format
 that includes an prefix string followed by an argument group string. The initial annotation prefix must be 
-configured via the call to `sensu-multiplexer-check`. The argument group segment will be used as part of the 
+configured via the call to `sensu-check-multiplexer`. The argument group segment will be used as part of the 
 generated event name.
 
 ### Individual Argument Annotation Key Format
@@ -191,10 +191,10 @@ consider doing so! If you're using sensuctl 5.13 with Sensu Backend 5.13 or late
 following command to add the asset:
 
 ```
-sensuctl asset add sensu/sensu-multiplexer-check
+sensuctl asset add sensu/sensu-check-multiplexer
 ```
 
-If you're using an earlier version of sensuctl, you can find the asset on the [Bonsai Asset Index][https://bonsai.sensu.io/assets/sensu/sensu-multiplexer-check].
+If you're using an earlier version of sensuctl, you can find the asset on the [Bonsai Asset Index][https://bonsai.sensu.io/assets/sensu/sensu-check-multiplexer].
 
 ### Check definition
 
@@ -206,12 +206,12 @@ metadata:
   name: multiplexed-http-check
   namespace: default
 spec:
-  command: sensu-multiplexer-check --command http-check --annotation-prefix "http-check/args"
+  command: sensu-check-multiplexer --command http-check --annotation-prefix "http-check/args"
   stdin: true
   subscriptions:
   - system
   runtime_assets:
-  - sensu/sensu-multiplexer-check
+  - sensu/sensu-check-multiplexer
   - sensu/http-checks
 ```
 
@@ -219,7 +219,7 @@ Note: `stdin: true` is required for the multiplexer to work. The command argumen
 
 ### Annotation Keyspace
 Because this check requires stdin, all of the commandline arguments can be set via entity or check level annotations using 
-the annotation prefix: `sensu.io/plugins/sensu-multiplexer-check/config`
+the annotation prefix: `sensu.io/plugins/sensu-check-multiplexer/config`
 
 #### Annotated Check definition example 
 
@@ -231,15 +231,15 @@ metadata:
   name: multiplexed-http-check
   namespace: default
   annotations: 
-    sensu.io/plugins/sensu-multiplexer-check/config/command: http-check
-    sensu.io/plugins/sensu-multiplexer-check/config/annotation-prefix: http-check/args
+    sensu.io/plugins/sensu-check-multiplexer/config/command: http-check
+    sensu.io/plugins/sensu-check-multiplexer/config/annotation-prefix: http-check/args
 spec:
-  command: sensu-multiplexer-check
+  command: sensu-check-multiplexer
   stdin: true
   subscriptions:
   - system
   runtime_assets:
-  - sensu/sensu-multiplexer-check
+  - sensu/sensu-check-multiplexer
   - sensu/http-checks
 ```
 
@@ -249,7 +249,7 @@ The preferred way of installing and deploying this plugin is to use it as an Ass
 like to compile and install the plugin from source or contribute to it, download the latest version
 or create an executable script from this source.
 
-From the local path of the sensu-multiplexer-check repository:
+From the local path of the sensu-check-multiplexer repository:
 
 ```
 go build

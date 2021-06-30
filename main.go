@@ -46,9 +46,9 @@ var (
 	useStdin    = false
 	plugin      = Config{
 		PluginConfig: sensu.PluginConfig{
-			Name:     "sensu-multiplexer-check",
+			Name:     "sensu-check-multiplexer",
 			Short:    "Multiplexer Check",
-			Keyspace: "sensu.io/plugins/sensu-multiplexer-check/config",
+			Keyspace: "sensu.io/plugins/sensu-check-multiplexer/config",
 		},
 	}
 

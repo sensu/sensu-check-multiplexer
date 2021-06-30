@@ -1,4 +1,4 @@
-module github.com/jspaleta/sensu-multiplexer-check
+module github.com/sensu/sensu-check-multiplexer
 
 go 1.14
 

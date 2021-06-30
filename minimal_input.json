@@ -2,8 +2,7 @@
   "check": {
     "metadata": {
       "annotations": {
-	"sensu.io/plugins/sensu-multiplexer-check/config/command": "http-check",
-        "sensu.io/plugins/sensu-multiplexer-check/config/annotation-prefix": "http-check/args",
+        "sensu.io/plugins/sensu-check-multiplexer/config/annotation-prefix": "http-check/args",
         "http-check/args/check-test": "-u https://www.sensu.io/",
         "http-check/args/bad/url": "http://bonsai.sensu.io/"
         }
