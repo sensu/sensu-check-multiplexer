@@ -2,7 +2,7 @@
 ![Go Test](https://github.com/sensu/sensu-check-multiplexer/workflows/Go%20Test/badge.svg)
 ![goreleaser](https://github.com/sensu/sensu-check-multiplexer/workflows/goreleaser/badge.svg)
 
-# Multiplexer Check
+# Check Multiplexer
 
 ## Table of Contents
 - [Overview](#overview)
@@ -15,7 +15,7 @@
 - [Contributing](#contributing)
 
 ## Overview
-The Multiplexer Check is a [Sensu Check][6] that allows to run a command multiple times with different 
+The Sensu Check Multiplexer is a [Sensu Check][6] that allows to run a Sensu check command multiple times with different 
 arguments and generate separate Sensu events for each command execution.
 
 The command calling arguments are controlled using either check or entity annotations.
@@ -31,7 +31,7 @@ Note: The Sensu Check configurion must specify `stdin: true` for correct operati
 #### Help output
 
 ```
-Multiplexer Check
+Check Multiplexer
 
 Usage:
   sensu-check-multiplexer [flags]
