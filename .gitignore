@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-sensu-multiplexer-check
+sensu-check-multiplexer
 
 # Test binary, build with `go test -c`
 *.test
