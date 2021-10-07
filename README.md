@@ -158,7 +158,7 @@ set of commandline arguments.
 Ex:
 ```
 "http-check/args/bonsai/url": "http://bonsai.sensu.io/"
-"http-check/args/bonsai/redirecti-ok": ""
+"http-check/args/bonsai/redirect-ok": ""
 ```
 These annotations represents the argument string `--url http://bonsai.sensu.io/ --redirect-ok`
 when using the annotation prefix `http-check/args`.  The argument group name
